@@ -60,6 +60,8 @@ int main(int argc, char **argv){
   if(listen(sock, MAX_CLIENTS) == -1)
     error(" Listen error ");
 
+  pthread_mutex_t mutexLock = PTHREAD_MUTEX_INITIALIZER;
+
   for(;;){ /* Comenzamos con el bucle infinito*/
     /* Pedimos memoria para el socket */
     soclient = malloc(sizeof(int));
@@ -71,8 +73,12 @@ int main(int argc, char **argv){
                           , &clientelen)) == -1)
       error("No se puedo aceptar la conexión. ");
 
+    argsT_t argsT;
+
+    argsT.mutex = mutexLock;
+    argsT.sockclient = soclient;
     /* Le enviamos el socket al hijo*/
-    pthread_create(&thread , NULL , child, (void *) soclient);
+    pthread_create(&thread , NULL , child, (void *) &argsT);
 
     /* El servidor puede hacer alguna tarea más o simplemente volver a esperar*/
   }
@@ -83,17 +89,19 @@ int main(int argc, char **argv){
   return 0;
 }
 
-void * child(void *_arg){
-  int socket = *(int*) _arg;
+void * child(void* argsT){
+  pthread_mutex_t mutexLock = ((argsT_t*)argsT)->mutex;
+  int soclient = ((argsT_t*)argsT)->sockclient;
+  
   char buf[1024];
 
   /* SEND PING! */
-  send(socket, "PING!", sizeof("PING!"), 0);
+  send(soclient, "PING!", sizeof("PING!"), 0);
   /* WAIT FOR PONG! */
-  recv(socket, buf, sizeof(buf), 0);
+  recv(soclient, buf, sizeof(buf), 0);
   printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), buf);
 
-  free((int*)_arg);
+  free(&soclient);
   return NULL;
 }
 
