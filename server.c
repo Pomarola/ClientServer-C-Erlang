@@ -1,29 +1,70 @@
 #include "server.h"
 
-/* RemoteMultiThreadServer.c */
-/* Cabeceras de Sockets */
 #include <sys/types.h>
 #include <sys/socket.h>
-/* Cabecera de direcciones por red */
 #include <netinet/in.h>
-/**********/
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-/**********/
-/* Threads! */
 #include <pthread.h>
+#include <string.h>
 
-/* Asumimos que el primer argumento es el puerto por el cual escuchará nuestro
-servidor */
+client* init_client_array() {
 
-/* Maxima cantidad de cliente que soportará nuestro servidor */
-#define MAX_CLIENTS 25
+  for (int i = 0; i < MAX_CLIENTS; i++) {
+    clientArray[i].socket = -1;
+  }
 
-/* Anunciamos el prototipo del hijo */
-void *child(void *arg);
-/* Definimos una pequeña función auxiliar de error */
-void error(char *msg);
+  return clientArray;
+}
+
+int search_nickname(client* clientArray, char* nickname) {
+  int found = 0, i = 0;
+  for (; i < MAX_CLIENTS && !found; i++) {
+    if (!strcmp(clientArray[i]->nickname, nickname))
+      found = 1;
+  }
+
+  return found;
+}
+
+// Devuelve 0 si no lo pudo eliminar
+int delete_client (client* clientArray, int sockClient) {
+  int found = 0, i = 0;
+  for (; i < MAX_CLIENTS && !found; i++) {
+    if (clientArray[i]->socket == sockClient)
+      found = 1;
+  }
+  if (i != MAX_CLIENTS) {
+    clientArray[i].socket = -1;
+  }
+
+  return found
+}
+
+/* Devuelve:
+0 msg al canal general
+1 msg privado
+2 cambio nickname
+3 exit
+4 comando no reconocido
+*/
+int take_action (char* buf) {
+  int action = 0;
+
+  if (buf[0] == '/') {
+    if (!strncmp(buf, "/msg ", strlen("/msg ")))
+      action = 1;
+    else if (!strncmp(buf, "/nickname ", strlen("/nickname ")))
+      action = 2;
+    else if (!strcmp(buf, "/exit"))
+      action = 3;
+    else
+      action = 4;
+  }
+
+  return action;
+}
 
 int main(int argc, char **argv){
   int sock, *soclient;
@@ -78,7 +119,7 @@ int main(int argc, char **argv){
     argsT.mutex = mutexLock;
     argsT.sockclient = soclient;
     /* Le enviamos el socket al hijo*/
-    pthread_create(&thread , NULL , child, (void *) &argsT);
+    pthread_create(&thread , &attr , worker, (void *) &argsT);
 
     /* El servidor puede hacer alguna tarea más o simplemente volver a esperar*/
   }
@@ -89,17 +130,45 @@ int main(int argc, char **argv){
   return 0;
 }
 
-void * child(void* argsT){
+void * worker(void* argsT){
   pthread_mutex_t mutexLock = ((argsT_t*)argsT)->mutex;
   int soclient = ((argsT_t*)argsT)->sockclient;
-  
-  char buf[1024];
+  int working = 0;
+  char buf[MSG_LEN];
 
   /* SEND PING! */
   send(soclient, "PING!", sizeof("PING!"), 0);
   /* WAIT FOR PONG! */
   recv(soclient, buf, sizeof(buf), 0);
   printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), buf);
+
+  while (!working) {
+    int action = take_action(buf);
+    switch (action) {
+    case 0:
+      // Envia a chat general
+      break;
+
+    case 1:
+      // msg privado
+      break;
+
+    case 2:
+      // cambio nickname
+      break;
+
+    case 3:
+      strcpy(buf, "Hasta luego!");
+      working = 1;
+      break;
+    
+    default:
+      strcpy(buf, "Comando no reconocido");
+      break;
+    }
+
+    send(soclient, buf, sizeof(buf), 0);
+  }
 
   free(&soclient);
   return NULL;
