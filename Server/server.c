@@ -6,13 +6,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <pthread.h>
 #include <string.h>
 
 int search_nickname(client* clientArray, char* nickname) {
   int found = 0, i = 0;
   for (; i < MAX_CLIENTS && !found; i++) {
-    if (!strcmp(clientArray[i]->nickname, nickname))
+    if (!strcmp(clientArray[i].nickname, nickname))
       found = 1;
   }
 
@@ -22,43 +21,43 @@ int search_nickname(client* clientArray, char* nickname) {
 int obtain_socket(client* clientArray, char* nickname) {
   int found = 0, i = 0, socket = -1;
   for (; i < MAX_CLIENTS && !found; i++) {
-    if (!strcmp(clientArray[i]->nickname, nickname))
+    if (!strcmp(clientArray[i].nickname, nickname))
       found = 1;
   }
 
   if (found) 
-    socket = clientArray[i]->socket;
+    socket = clientArray[i].socket;
 
   return socket;
 }
 
 void new_client(client* clientArray, char* nickname, int socket) {
   int i = 0;
-  for (; clientArray[i]->socket != -1; i++);
+  for (; clientArray[i].socket != -1; i++);
 
-  strcpy(clientArray[i]->nickname, nickname);
-  clientArray[i]->socket = socket;
+  strcpy(clientArray[i].nickname, nickname);
+  clientArray[i].socket = socket;
 }
 
 void change_nickname(client* clientArray, char* newNickname, int socket) {
   int i = 0;
-  for (; clientArray[i]->socket != socket; i++);
+  for (; clientArray[i].socket != socket; i++);
 
-  strcpy(clientArray[i]->nickname, nickname);
+  strcpy(clientArray[i].nickname, nickname);
 }
 
 // Devuelve 0 si no lo pudo eliminar
 int delete_client (client* clientArray, int sockClient) {
   int found = 0, i = 0;
   for (; i < MAX_CLIENTS && !found; i++) {
-    if (clientArray[i]->socket == sockClient)
+    if (clientArray[i].socket == sockClient)
       found = 1;
   }
   if (i != MAX_CLIENTS) {
     clientArray[i].socket = -1;
   }
 
-  return found
+  return found;
 }
 
 /* Devuelve:
@@ -142,7 +141,7 @@ int main(int argc, char **argv){
     argsT_t argsT;
 
     argsT.mutex = mutexLock;
-    argsT.sockclient = soclient;
+    argsT.sockclient = *soclient;
     argsT.clientArr = clientArray;
     /* Le enviamos el socket al hijo*/
     pthread_create(&thread , &attr , worker, (void *) &argsT);
@@ -192,9 +191,10 @@ void * worker(void* argsT){
       pthread_mutex_lock(&mutexLock);
 
       for (int i = 0; i < MAX_CLIENTS; i++){
-        if (clientArray[i]->socket != -1)
+        if (clientArray[i].socket != -1) {
           sprintf(msg, "[%s]: %s", nickname, buf);
-          send(clientArray[i]->socket, msg, sizeof(msg), 0);
+          send(clientArray[i].socket, msg, sizeof(msg), 0);
+        }
       }
 
       pthread_mutex_unlock(&mutexLock);

@@ -1,22 +1,15 @@
-ARG = -Wall -Wextra -Werror -g -std=c99 -pthread
-BARRIER = ./Barrier/barrier
-BOARD = ./Board/board
-GAME = ./Game/game
-TEMP = game.o barrier.o board.o simulador
+ARG = -Wall -Wextra -Werror -g -std=gnu99 -pthread
+SERVER = ./Server/server
+CLIENT = ./Client/client
+TEMP = server client
 
-all: simulador
+all: server client
 
-simulador: simulador.c game.o board.o barrier.o
-	gcc $(ARG) -o simulador simulador.c game.o board.o barrier.o -lm
+server: $(SERVER).c $(SERVER).h
+	gcc $(ARG) -o server $(SERVER).c -lm
 
-game.o: $(GAME).c $(GAME).h
-	gcc $(ARG) -c $(GAME).c 
-
-barrier.o: $(BARRIER).c $(BARRIER).h
-	gcc $(ARG) -c $(BARRIER).c 
-
-board.o: $(BOARD).c $(BOARD).h
-	gcc $(ARG) -c $(BOARD).c 
+client: $(CLIENT).c $(CLIENT).h
+	gcc $(ARG) -o client $(CLIENT).c -lm
 
 clean:
 	-rm $(TEMP)
