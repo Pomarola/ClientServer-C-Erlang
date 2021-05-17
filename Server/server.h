@@ -5,7 +5,7 @@
 
 #define MSG_LEN 1200
 /* Maxima cantidad de cliente que soportará nuestro servidor */
-#define MAX_CLIENTS 20
+#define MAX_CLIENTS 5
 #define MAX_NICKNAME 150
 
 typedef struct _client {

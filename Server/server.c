@@ -13,6 +13,8 @@ int search_nickname(client* clientArray, char* nickname) {
   for (; i < MAX_CLIENTS && !found; i++) {
     if (!strcmp(clientArray[i].nickname, nickname))
       found = 1;
+    printf("NAME %s\n", clientArray[i].nickname);
+    printf("SOCK %d\n", clientArray[i].socket);
   }
 
   return found;
@@ -26,7 +28,7 @@ int obtain_socket(client* clientArray, char* nickname) {
   }
 
   if (found) 
-    socket = clientArray[i].socket;
+    socket = clientArray[i-1].socket;
 
   return socket;
 }
@@ -43,7 +45,7 @@ void change_nickname(client* clientArray, char* newNickname, int socket) {
   int i = 0;
   for (; clientArray[i].socket != socket; i++);
 
-  strcpy(clientArray[i].nickname, nickname);
+  strcpy(clientArray[i].nickname, newNickname);
 }
 
 // Devuelve 0 si no lo pudo eliminar
@@ -141,7 +143,7 @@ int main(int argc, char **argv){
     argsT_t argsT;
 
     argsT.mutex = mutexLock;
-    argsT.sockclient = *soclient;
+    argsT.sockClient = *soclient;
     argsT.clientArr = clientArray;
     /* Le enviamos el socket al hijo*/
     pthread_create(&thread , &attr , worker, (void *) &argsT);
@@ -157,26 +159,26 @@ int main(int argc, char **argv){
 
 void * worker(void* argsT){
   pthread_mutex_t mutexLock = ((argsT_t*)argsT)->mutex;
-  int soclient = ((argsT_t*)argsT)->sockclient;
+  int soclient = ((argsT_t*)argsT)->sockClient;
   client* clientArray = ((argsT_t*)argsT)->clientArr;
   int working = 1, valid = 0, socketDest;
-  char buf[MSG_LEN], msg[MSG_LEN], nickname[MAX_NICKNAME], nicknameDest[MAX_NICKNAME];
+  char buf[MSG_LEN], msg[MSG_LEN], nickname[MAX_NICKNAME], auxNickname[MAX_NICKNAME];
 
-  send(soclient, "Ingrese un nickname", sizeof("Ingrese un nickname"), 0);
+  send(soclient, "Ingrese un nickname", sizeof("Ingrese un nickname")+1, 0);
   while (!valid) {
     recv(soclient, nickname, sizeof(nickname), 0);
 
     pthread_mutex_lock(&mutexLock);
 
-      if (!search_nickname(clientArray, nickname)) {
-        new_client(clientArray, nickname, soclient);
-        pthread_mutex_unlock(&mutexLock);
-        send(soclient, "Bienvenido, ya puede comenzar a chatear", sizeof("Bienvenido, ya puede comenzar a chatear"), 0);
-        valid = 1;
-      } else {
-        pthread_mutex_unlock(&mutexLock);
-        send(soclient, "El nickname esta en uso, intente con otro", sizeof("El nickname esta en uso, intente con otro"), 0);
-      }
+    if (!search_nickname(clientArray, nickname)) {
+      new_client(clientArray, nickname, soclient);
+      pthread_mutex_unlock(&mutexLock);
+      send(soclient, "Bienvenido, ya puede comenzar a chatear", sizeof("Bienvenido, ya puede comenzar a chatear")+1, 0);
+      valid = 1;
+    } else {
+      pthread_mutex_unlock(&mutexLock);
+      send(soclient, "El nickname esta en uso, intente con otro", sizeof("El nickname esta en uso, intente con otro")+1, 0);
+    }
   }
 
   printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), buf); // TESTING
@@ -201,31 +203,36 @@ void * worker(void* argsT){
       break;
 
     case 1:
-      sscanf(buf, "%*s %s %s", nicknameDest, msg);
+      sscanf(buf, "%*s %s %[^\n]", auxNickname, msg);
+      printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), auxNickname);
       pthread_mutex_lock(&mutexLock);
 
-      socketDest = obtain_socket(clientArray, nicknameDest);
-      sprintf(buf, "[Privado] %s dice: %s", nickname, msg);
-      send(socketDest, buf, sizeof(buf), 0);
+      socketDest = obtain_socket(clientArray, auxNickname);
+      if (socketDest != -1){
+        sprintf(buf, "[Privado] %s dice: %s", nickname, msg);
+        send(socketDest, buf, sizeof(buf), 0);
+      } else
+        send(soclient, "No se reconoce al usuario con el que se esta intentando chatear", sizeof("No se reconoce al usuario con el que se esta intentando chatear")+1, 0);
 
       pthread_mutex_unlock(&mutexLock);
       break;
 
     case 2:
-      sscanf(buf, "%*s %s", nickname);
+      sscanf(buf, "%*s %s", auxNickname);
       pthread_mutex_lock(&mutexLock);
 
-      if (!search_nickname(clientArray, nickname)){
-        change_nickname(clientArray, nickname, soclient);
-        send(soclient, "Se cambio el nickname correctamente", sizeof("Se cambio el nickname correctamente"), 0);
+      if (!search_nickname(clientArray, auxNickname)){
+        change_nickname(clientArray, auxNickname, soclient);
+        send(soclient, "Se cambio el nickname correctamente", sizeof("Se cambio el nickname correctamente")+1, 0);
+        strcpy(nickname, auxNickname);
       } else  
-        send(soclient, "Nickname ocupado, intente con otro", sizeof("Nickname ocupado, intente con otro"), 0);
+        send(soclient, "Nickname ocupado, intente con otro", sizeof("Nickname ocupado, intente con otro")+1, 0);
 
       pthread_mutex_unlock(&mutexLock);
       break;
 
     case 3:
-      send(soclient, "Hasta luego!", sizeof("Hasta luego!"), 0);
+      send(soclient, "Hasta luego!", sizeof("Hasta luego!")+1, 0);
 
       pthread_mutex_lock(&mutexLock);
       delete_client(clientArray, soclient);
@@ -234,12 +241,11 @@ void * worker(void* argsT){
       break;
     
     default:
-      send(soclient, "Comando no reconocido", sizeof("Comando no reconocido"), 0);
+      send(soclient, "Comando no reconocido", sizeof("Comando no reconocido")+1, 0);
       break;
     }
   }
 
-  free(&soclient);
   return NULL;
 }
 

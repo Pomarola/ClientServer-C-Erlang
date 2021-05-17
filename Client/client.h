@@ -5,6 +5,6 @@
 
 void error(char *msg);
 
-void * sendMsg(void* arg);
+void *sendMsg(void* arg);
 
 #endif

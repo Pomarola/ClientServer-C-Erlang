@@ -27,8 +27,8 @@ void error(char *msg){
 }
 
 int main(int argc, char **argv){
-  int sock, salir = 0;
-  char buf[1024];
+  int sock;
+  char buf[MSG_LEN];
   struct addrinfo *resultado;
 
   /*Chequeamos mínimamente que los argumentos fueron pasados*/
@@ -55,10 +55,11 @@ int main(int argc, char **argv){
 
   pthread_t thread;
   int connected = 1;
-  pthread_create(&thread, NULL, sendMsg, (void*) sock);
+  pthread_create(&thread, NULL, sendMsg, (void*) &sock);
 
   while(connected) {
-    recv(sock, buf, sizeof(buf),0);
+    recv(sock, buf, sizeof(buf), 0);
+    buf[1199] = '\0';
     printf("%s\n", buf);
     if(!strcmp(buf, "Hasta luego!"))
       connected = 0;
@@ -76,7 +77,8 @@ void * sendMsg(void* arg) {
   char buf[MSG_LEN];
 
   while (conected) {
-    if(!strcmp(fgets(buf, sizeof(buf), stdin), "/exit\n"))
+    scanf(" %[^\n]", buf);
+    if(!strcmp(buf, "/exit"))
       conected = 0;
     send(socketSv, buf, sizeof(buf), 0);
   }
