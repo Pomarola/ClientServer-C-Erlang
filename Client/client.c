@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
+#include <signal.h>
 
 /*
   El archivo describe un sencillo cliente que se conecta al servidor establecido
@@ -22,14 +23,15 @@
   $cliente IP port
  */
 
+int socketSv;
+struct addrinfo *result;
+
 void error(char *msg){
   exit((perror(msg), 1));
 }
 
 int main(int argc, char **argv){
-  int sock;
   char buf[MSG_LEN];
-  struct addrinfo *resultado;
 
   /*Chequeamos mínimamente que los argumentos fueron pasados*/
   if(argc != 3){
@@ -38,50 +40,58 @@ int main(int argc, char **argv){
   }
 
   /* Inicializamos el socket */
-  if( (sock = socket(AF_INET , SOCK_STREAM, 0)) < 0 )
+  if( (socketSv = socket(AF_INET , SOCK_STREAM, 0)) < 0 )
     error("No se pudo iniciar el socket");
 
   /* Buscamos la dirección del hostname:port */
-  if (getaddrinfo(argv[1], argv[2], NULL, &resultado)){
+  if (getaddrinfo(argv[1], argv[2], NULL, &result)){
     fprintf(stderr,"No se encontro el host: %s \n",argv[1]);
     exit(2);
   }
 
-  if(connect(sock, (struct sockaddr *) resultado->ai_addr, resultado->ai_addrlen) != 0)
+  if(connect(socketSv, (struct sockaddr *) result->ai_addr, result->ai_addrlen) != 0)
     /* if(connect(sock, (struct sockaddr *) &servidor, sizeof(servidor)) != 0) */
     error("No se pudo conectar :(. ");
 
   printf("La conexión fue un éxito!\n");
 
+  signal(SIGINT, shut_down);
+
   pthread_t thread;
   int connected = 1;
-  pthread_create(&thread, NULL, sendMsg, (void*) &sock);
+  pthread_create(&thread, NULL, sendMsg, NULL);
 
   while(connected) {
-    recv(sock, buf, sizeof(buf), 0);
+    recv(socketSv, buf, sizeof(buf), 0);
     buf[1199] = '\0';
     printf("%s\n", buf);
     if(!strcmp(buf, "Hasta luego!"))
       connected = 0;
   }
   /* Cerramos :D!*/
-  freeaddrinfo(resultado);
-  close(sock);
+  freeaddrinfo(result);
+  close(socketSv);
 
   return 0;
 }
 
-void * sendMsg(void* arg) {
-  int socketSv = *(int*) arg;
-  int conected = 1;
+void * sendMsg() {
   char buf[MSG_LEN];
 
-  while (conected) {
+  while (1) {
     scanf(" %[^\n]", buf);
     if(!strcmp(buf, "/exit"))
-      conected = 0;
+      raise(SIGINT);
     send(socketSv, buf, sizeof(buf), 0);
   }
 
   return NULL;
+}
+
+void shut_down (int signal) {
+
+  send(socketSv, "/exit", sizeof("/exit")+1, 0);
+  freeaddrinfo(result);
+  close(socketSv);
+  exit(0);
 }
