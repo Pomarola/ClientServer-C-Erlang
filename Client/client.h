@@ -5,6 +5,8 @@
 
 void error(char *msg);
 
-void *sendMsg(void* arg);
+void *sendMsg();
+
+void shut_down (int signal);
 
 #endif

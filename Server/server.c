@@ -166,7 +166,9 @@ void * worker(void* argsT){
 
   send(soclient, "Ingrese un nickname", sizeof("Ingrese un nickname")+1, 0);
   while (!valid) {
-    recv(soclient, nickname, sizeof(nickname), 0);
+    recv(soclient, buf, sizeof(buf), 0);
+    stpcpy(nickname, buf);
+    printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), nickname); // TESTING
 
     pthread_mutex_lock(&mutexLock);
 
@@ -180,8 +182,6 @@ void * worker(void* argsT){
       send(soclient, "El nickname esta en uso, intente con otro", sizeof("El nickname esta en uso, intente con otro")+1, 0);
     }
   }
-
-  printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), buf); // TESTING
 
   while (working) {
     recv(soclient, buf, sizeof(buf), 0);
@@ -203,8 +203,8 @@ void * worker(void* argsT){
       break;
 
     case 1:
+      strcpy(msg,"");
       sscanf(buf, "%*s %s %[^\n]", auxNickname, msg);
-      printf("Hilo[%ld] --> Recv: %s\n", pthread_self(), auxNickname);
       pthread_mutex_lock(&mutexLock);
 
       socketDest = obtain_socket(clientArray, auxNickname);
