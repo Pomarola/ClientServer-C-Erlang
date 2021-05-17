@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <pthread.h>
 #include <string.h>
 
 /*
@@ -52,29 +53,33 @@ int main(int argc, char **argv){
 
   printf("La conexión fue un éxito!\n");
 
-  /* Recibimos peticion de nickname por parte del servidor */
-  recv(sock, buf, sizeof(buf),0);
-  printf("Recv:%s\n", buf);
+  pthread_t thread;
+  int connected = 1;
+  pthread_create(&thread, NULL, sendMsg, (void*) sock);
 
-  if(strcmp(fgets(buf, sizeof(buf), stdin), "/exit\n") == 0)
-    salir = 1;
-  send(sock, buf, sizeof(buf), 0);
-
-  recv(sock, buf, sizeof(buf),0);
-  printf("Recv:%s\n", buf);     // Respondemos que el nickname se puso correctamente o decimos hasta luego
-
-  while (!salir) {
-      if(strcmp(fgets(buf, sizeof(buf), stdin), "/exit\n") == 0) // ver como hacer para que siempre se haga recv hasta que se intente ingresar por teclado
-        salir = 1;
-      send(sock, buf, sizeof(buf), 0);
-
-      recv(sock, buf, sizeof(buf),0);
-      printf("Recv:%s\n", buf);
+  while(connected) {
+    recv(sock, buf, sizeof(buf),0);
+    printf("%s\n", buf);
+    if(!strcmp(buf, "Hasta luego!"))
+      connected = 0;
   }
-
   /* Cerramos :D!*/
   freeaddrinfo(resultado);
   close(sock);
 
   return 0;
+}
+
+void * sendMsg(void* arg) {
+  int socketSv = *(int*) arg;
+  int conected = 1;
+  char buf[MSG_LEN];
+
+  while (conected) {
+    if(!strcmp(fgets(buf, sizeof(buf), stdin), "/exit\n"))
+      conected = 0;
+    send(socketSv, buf, sizeof(buf), 0);
+  }
+
+  return NULL;
 }
